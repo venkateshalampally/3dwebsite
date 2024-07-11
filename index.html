@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Typing Speed Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+        #input {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            padding: 10px;
+            width: 80%;
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <div>Time: <span id="time">60</span>s</div>
+        <div>WPM: <span id="wpm">0</span></div>
+        <div>Accuracy: <span id="accuracy">100</span>%</div>
+    </div>
+    <input type="text" id="input" autocomplete="off" placeholder="Start typing here...">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Create a "road" for the words
+        const roadGeometry = new THREE.PlaneGeometry(20, 100);
+        const roadMaterial = new THREE.MeshBasicMaterial({color: 0x444444});
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.z = -50;
+        scene.add(road);
+
+        camera.position.y = 5;
+        camera.rotation.x = -0.2;
+
+        // Typing test variables
+        let words = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"];
+        let currentWordIndex = 0;
+        let startTime, endTime;
+        let totalTyped = 0;
+        let correctTyped = 0;
+
+        // Create word objects
+        let wordObjects = [];
+        const loader = new THREE.FontLoader();
+        loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font) {
+            words.forEach((word, index) => {
+                const geometry = new THREE.TextGeometry(word, {
+                    font: font,
+                    size: 1,
+                    height: 0.2,
+                });
+                const material = new THREE.MeshPhongMaterial({color: 0xffffff});
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(0, 1, -10 * index - 10);
+                scene.add(mesh);
+                wordObjects.push(mesh);
+            });
+        });
+
+        // Add lighting
+        const light = new THREE.PointLight(0xffffff, 1, 100);
+        light.position.set(0, 10, 0);
+        scene.add(light);
+
+        // Input handling
+        const inputElement = document.getElementById('input');
+        inputElement.addEventListener('input', checkInput);
+
+        function checkInput() {
+            if (!startTime) startTime = new Date();
+            let inputWord = inputElement.value;
+            if (inputWord.endsWith(' ')) {
+                inputWord = inputWord.trim();
+                totalTyped += inputWord.length + 1;
+                if (inputWord === words[currentWordIndex]) {
+                    correctTyped += inputWord.length + 1;
+                    wordObjects[currentWordIndex].material.color.setHex(0x00ff00);
+                } else {
+                    wordObjects[currentWordIndex].material.color.setHex(0xff0000);
+                }
+                currentWordIndex++;
+                inputElement.value = '';
+                if (currentWordIndex >= words.length) endTest();
+            }
+        }
+
+        function endTest() {
+            endTime = new Date();
+            const timeElapsed = (endTime - startTime) / 1000 / 60; // in minutes
+            const wpm = Math.round((correctTyped / 5) / timeElapsed);
+            const accuracy = Math.round((correctTyped / totalTyped) * 100);
+            document.getElementById('wpm').textContent = wpm;
+            document.getElementById('accuracy').textContent = accuracy;
+            inputElement.disabled = true;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            wordObjects.forEach(word => {
+                word.position.z += 0.05;
+                if (word.position.z > 10) word.position.z = -90;
+            });
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Timer
+        let timeLeft = 60;
+        const timer = setInterval(() => {
+            timeLeft--;
+            document.getElementById('time').textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                endTest();
+            }
+        }, 1000);
+
+        // Handle window resizing
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
